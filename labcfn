@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template for RDS Instance and Security Group
+
+Resources:
+  MyDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable access to RDS instance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          CidrIp: 0.0.0.0/0  # Adjust this to restrict access
+
+  MyDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: mydbinstance
+      AllocatedStorage: 20
+      DBInstanceClass: db.t2.micro
+      Engine: mysql
+      MasterUsername: admin
+      MasterUserPassword: password123  # Use AWS Secrets Manager for better security
+      VPCSecurityGroups:
+        - !Ref MyDBSecurityGroup
+      DBName: mydatabase
+      BackupRetentionPeriod: 7
+      MultiAZ: false
+      PubliclyAccessible: true
+
+Outputs:
+  DBInstanceEndpoint:
+    Description: The endpoint address of the RDS instance
+    Value: !GetAtt MyDBInstance.Endpoint.Address

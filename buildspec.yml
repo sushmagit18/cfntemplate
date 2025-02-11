@@ -1,0 +1,43 @@
+version: 0.2
+
+env:
+  variables:
+    STACK_NAME: "application-stack"
+    TEMPLATE_FILE: "application-cfn.yaml"
+  parameter-store:
+    PARAMETERS: |
+                ParameterKey=VpcId,Parametervalue=vpc-06c367b0a8c4e9094
+                ParameterKey=AMIId,Parametervalue=ami-0db18496905e01e3d
+                ParameterKey=SubnetId1,Parametervalue=subnet-018ee9be5adc9d8d5
+                ParameterKey=SubnetId2,Parametervalue=subnet-0b0a594422d60eca3
+                ParameterKey=ASGMinValue,Parametervalue2
+                ParameterKey=ASGMaxValue,Parametervalue10
+
+phases:
+  install:
+    commands:
+      - echo "Installing dependencies..."
+      - pip install --upgrade awscli
+
+  pre_build:
+    commands:
+      - echo "Checking AWS CLI version..."
+      - aws --version
+      - echo "Validating CloudFormation template..."
+      - aws cloudformation validate-template --template-body file://${TEMPLATE_FILE}
+
+  build:
+    commands:
+      - echo "Deploying CloudFormation stack..."
+      - aws cloudformation deploy \
+          --template-file ${TEMPLATE_FILE} \
+          --stack-name ${STACK_NAME} \
+          --region $AWS_REGION \
+          --capabilities CAPABILITY_NAMED_IAM \
+          --parameter-overrides $(echo "${PARAMETERS}" | tr '\n' ' ')
+
+  post_build:
+    commands:
+      - echo "Deployment complete!"
+      - echo "Getting stack outputs..."
+      - aws cloudformation describe-stacks --stack-name ${STACK_NAME} --query "Stacks[0].Outputs"

@@ -1,0 +1,214 @@
+
+Parameters:
+  VpcID:
+    Description: Enter your VPC ID
+    Type: String
+
+  EC2SGName:
+    Description: Enter your EC2 SG Name
+    Type: String
+    Default: "Application-EC2-SG-New"
+
+
+  ALBSGName:
+    Description: Enter your ALB SG Name
+    Type: String
+    Default: "Application-ALB-SG-New"
+  
+  LaunchTemplateName:
+    Description: Enter your EC2 Launch Template Name
+    Type: String
+    Default: "Application-Launch-Template-New"
+  
+  AMIID:
+    Description: Enter your EC2 AMI ID
+    Type: String
+
+  InstanceType:
+    Description: Enter t2.micro, m1.small, or m1.large. Default is t2.micro.
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t2.micro
+      - m1.small
+      - m1.large
+
+  TargetGroupName:
+    Description: Enter your ALB TargetGroupName
+    Type: String
+    Default: "Application-ALB-TG"
+
+  
+  TargetGroupPort:
+    Description: Enter your ALB Targets Port
+    Type: Number
+    Default: 80
+
+
+  ALBName:
+    Description: Enter your ALB Name
+    Type: String
+    Default: "Application-ALB-New"
+
+  
+  ALBScheme:
+    Description: Define your Public or Private Scheme for Load Balancer
+    Type: String
+    Default: internet-facing
+    AllowedValues:
+      - internet-facing
+      - internal
+      
+
+
+  SubnetID1:
+    Description: Enter your AZ1 SubnetID
+    Type: String
+  
+  SubnetID2:
+    Description: Enter your AZ2 SubnetID
+    Type: String
+
+  LBType:
+    Description: Define your Load Balancer Type
+    Type: String
+    Default: application
+    AllowedValues:
+      - application
+      - network
+  
+  ASGName:
+    Description: Enter your ASG Name
+    Type: String
+     Default: "application-ASG"
+  
+  ASGMinValue:
+    Description: Enter your Min Size of ASG
+    Type: String
+
+  ASGMaxValue:
+    Description: Enter your Max Size of ASG
+    Type: String
+
+  ASGScalingThreshold:
+    Description: Enter your CPU Utilization Threshold
+    Type: String
+    Default: 50.0
+
+
+Resources:
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref EC2SGName
+      GroupDescription: This is Public EC2 SG Allow-80,443,22
+      VpcId: !Ref VpcID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+  
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref ALBSGName
+      GroupDescription: This is Public ALB SG Allow-80,443
+      VpcId: !Ref VpcID
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+
+  EC2LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Ref LaunchTemplateName
+      LaunchTemplateData:
+        ImageId: !Ref AMIID
+        InstanceType: !Ref InstanceType
+        SecurityGroupIds:
+          - !Ref EC2SecurityGroup
+        UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            yum update -y
+            yum install -y httpd
+            systemctl start httpd
+            systemctl enable httpd
+            echo "<h1>Welcome to my web server</h1>" > /var/www/html/index.html
+
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      Name: !Ref TargetGroupName
+      TargetType: instance
+      VpcId: !Ref VpcID
+      Protocol: HTTP
+      Port: !Ref TargetGroupPort
+      HealthCheckPath: '/'
+      HealthCheckPort: traffic-port
+      HealthCheckProtocol: HTTP
+
+  FrontEndALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Ref ALBName
+      Scheme: !Ref ALBScheme
+      SecurityGroups: 
+        - !Ref ALBSecurityGroup
+      Subnets: 
+        - !Ref SubnetID1
+        - !Ref SubnetID2
+      Type: !Ref LBType
+
+  HTTPlistener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: "forward"
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref FrontEndALB
+      Port: 80
+      Protocol: "HTTP"
+  
+
+  AppASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Ref ASGName
+      LaunchTemplate:
+        LaunchTemplateId: !Ref EC2LaunchTemplate
+        Version: !GetAtt EC2LaunchTemplate.LatestVersionNumber
+      MaxSize: !Ref ASGMaxValue
+      MinSize: !Ref ASGMinValue
+      DesiredCapacity: !Ref ASGMinValue
+      VPCZoneIdentifier:   
+        - !Ref SubnetID1
+        - !Ref SubnetID2
+      TargetGroupARNs: 
+        - !Ref ALBTargetGroup
+
+  TargetTrackingScalingPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AppASG
+      PolicyType: TargetTrackingScaling
+      TargetTrackingConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ASGAverageCPUUtilization
+        TargetValue: !Ref ASGScalingThreshold

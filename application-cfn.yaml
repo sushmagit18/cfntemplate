@@ -48,7 +48,7 @@ Parameters:
   ALBName:
     Description: Enter your ALB Name
     Type: String
-    Default: "Application-ALB-New"
+    Default: "Application-ALB-Name"
 
   
   ALBScheme:

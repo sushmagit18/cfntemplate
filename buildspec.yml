@@ -15,8 +15,11 @@ env:
 phases:
   install:
     commands:
-      - echo "Installing dependencies..."
-      - pip install --upgrade awscli
+      - echo "Installing AWS CLI v2..."
+      - curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+      - unzip awscliv2.zip
+      - sudo ./aws/install --update
+      - aws --version
 
   pre_build:
     commands:

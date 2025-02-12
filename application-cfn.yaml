@@ -84,7 +84,7 @@ Parameters:
   ASGName:
     Description: Enter your ASG Name
     Type: String
-     Default: "application-ASG"
+    Default: "application-ASG"
   
   ASGMinValue:
     Description: Enter your Min Size of ASG
@@ -95,7 +95,7 @@ Parameters:
     Description: Enter your Max Size of ASG
     Type: String
     Default: 10
-    
+
 
   ASGScalingThreshold:
     Description: Enter your CPU Utilization Threshold
